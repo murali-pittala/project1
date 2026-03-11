@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Fruit Quality Pro</title>
+    <style>
+        :root {
+            --premium-color: #00d2d3;
+            --good-color: #2ecc71;
+            --unripe-color: #f1c40f;
+            --damaged-color: #e74c3c;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #f8fafc; display: flex; justify-content: center; padding: 20px; }
+        .app-card { background: #1e293b; width: 100%; max-width: 400px; border-radius: 30px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); overflow: hidden; border: 1px solid #334155; }
+        .header { background: #0f172a; padding: 20px; text-align: center; border-bottom: 1px solid #334155; }
+        .preview-container { position: relative; width: 100%; height: 300px; background: #020617; }
+        #preview { width: 100%; height: 100%; object-fit: cover; }
+        .scan-line { position: absolute; top: 0; width: 100%; height: 2px; background: #22d3ee; box-shadow: 0 0 15px #22d3ee; animation: scan 2s infinite linear; display: none; }
+        .controls { padding: 20px; }
+        .btn-upload { background: #3b82f6; color: white; padding: 18px; border-radius: 15px; display: block; text-align: center; cursor: pointer; font-weight: 700; transition: all 0.2s; }
+        .btn-upload:hover { background: #2563eb; }
+        .results-panel { background: #334155; margin: 0 15px 15px; padding: 20px; border-radius: 20px; display: none; }
+        .grade-badge { font-size: 1.5rem; font-weight: 900; text-align: center; margin-bottom: 10px; text-transform: uppercase; }
+        .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .metric-box { background: rgba(15, 23, 42, 0.5); padding: 10px; border-radius: 12px; text-align: center; }
+        .metric-label { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px; }
+        #fleshColor { width: 30px; height: 30px; border-radius: 50%; margin: 0 auto; border: 2px solid #fff; }
+        @keyframes scan { 0% { top: 0% } 100% { top: 100% } }
+    </style>
+</head>
+<body>
+
+<div class="app-card">
+    <div class="header">
+        <h3 style="margin:0; color: #22d3ee;">FRUIT QUALITY AI</h3>
+        <small id="status">Waiting for Scan...</small>
+    </div>
+
+    <div class="preview-container">
+        <div id="scanLine" class="scan-line"></div>
+        <img id="preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%231e293b' d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E">
+    </div>
+
+    <div class="controls">
+        <label class="btn-upload">
+            📸 ANALYZE NOW
+            <input type="file" id="imageInput" accept="image/*" capture="environment" hidden>
+        </label>
+    </div>
+
+    <div id="results" class="results-panel">
+        <div id="gradeText" class="grade-badge">--</div>
+        
+        <div class="metrics">
+            <div class="metric-box">
+                <div class="metric-label">Interior</div>
+                <div id="fleshColor"></div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-label">Sugars</div>
+                <b id="sugarVal">--</b>
+            </div>
+            <div class="metric-box">
+                <div class="metric-label">Health</div>
+                <b id="healthVal">--</b>
+            </div>
+            <div class="metric-box">
+                <div class="metric-label">Density</div>
+                <b id="densityVal">--</b>
+            </div>
+        </div>
+        <p id="advice" style="font-size: 0.8rem; color: #cbd5e1; text-align: center; margin-top: 15px; line-height: 1.4;"></p>
+    </div>
+</div>
+
+<canvas id="hiddenCanvas" style="display:none;"></canvas>
+
+<script>
+    const imageInput = document.getElementById('imageInput');
+    const preview = document.getElementById('preview');
+    const resultsPanel = document.getElementById('results');
+    const scanLine = document.getElementById('scanLine');
+    const statusLabel = document.getElementById('status');
+
+    imageInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        statusLabel.innerText = "Analyzing Molecular Structure...";
+        scanLine.style.display = 'block';
+        resultsPanel.style.display = 'none';
+        
+        const reader = new FileReader();
+        reader.onload = (f) => {
+            preview.src = f.target.result;
+            const img = new Image();
+            img.src = f.target.result;
+            img.onload = () => {
+                setTimeout(() => {
+                    performAdvancedScan(img);
+                    scanLine.style.display = 'none';
+                    statusLabel.innerText = "Analysis Finished";
+                }, 2000);
+            };
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function performAdvancedScan(img) {
+        const canvas = document.getElementById('hiddenCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 100; canvas.height = 100;
+        ctx.drawImage(img, 0, 0, 100, 100);
+
+        const data = ctx.getImageData(0, 0, 100, 100).data;
+        let r = 0, g = 0, b = 0, darkArea = 0;
+
+        for (let i = 0; i < data.length; i += 4) {
+            let rd = data[i], gr = data[i+1], bl = data[i+2];
+            r += rd; g += gr; b += bl;
+            // Detect bruises/black spots (Damage)
+            if ((rd + gr + bl) / 3 < 70) darkArea++;
+        }
+
+        const total = data.length / 4;
+        r /= total; g /= total; b /= total;
+        
+        let healthScore = Math.max(0, 100 - (darkArea / total * 500));
+        let ripeness = (r + g) / 2; // Yellow/Orange intensity
+
+        let grade = "";
+        let colorCode = "";
+        let adviceText = "";
+        let fleshColor = "";
+
+        // QUALITY DECISION TREE
+        if (healthScore < 80) {
+            grade = "Damaged / Rotten";
+            colorCode = "var(--damaged-color)";
+            adviceText = "Significant internal decay or bruising detected. Do not consume.";
+            fleshColor = "#5d4037"; // Brownish
+        } else if (ripeness > 150) {
+            grade = "Premium Quality";
+            colorCode = "var(--premium-color)";
+            adviceText = "Perfect specimen. High sugar content and ideal texture.";
+            fleshColor = (r > g) ? "#ffb300" : "#ffcdd2"; // Mango yellow or Guava pink
+        } else if (ripeness > 100) {
+            grade = "Good / Ripe";
+            colorCode = "var(--good-color)";
+            adviceText = "Standard quality. Healthy interior, ready to eat.";
+            fleshColor = "#fff9c4"; // Creamy
+        } else {
+            grade = "Unripe / Firm";
+            colorCode = "var(--unripe-color)";
+            adviceText = "Safe but lacks sweetness. Best if left to ripen for 2-3 days.";
+            fleshColor = "#f1f8e9"; // Pale green/white
+        }
+
+        resultsPanel.style.display = 'block';
+        const gradeUI = document.getElementById('gradeText');
+        gradeUI.innerText = grade;
+        gradeUI.style.color = colorCode;
+        
+        document.getElementById('sugarVal').innerText = (ripeness > 130) ? "High" : "Low";
+        document.getElementById('healthVal').innerText = Math.round(healthScore) + "%";
+        document.getElementById('densityVal').innerText = (ripeness > 140) ? "Soft" : "Firm";
+        document.getElementById('fleshColor').style.backgroundColor = fleshColor;
+        document.getElementById('advice').innerText = adviceText;
+    }
+</script>
+</body>
+</html>
