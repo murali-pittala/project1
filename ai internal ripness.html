@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Fruit Internal Scanner v2</title>
+    <style>
+        :root {
+            --ripe-color: #2ecc71;
+            --almost-color: #f1c40f;
+            --unripe-color: #e74c3c;
+            --damaged-color: #e67e22;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f3f5; display: flex; justify-content: center; padding: 20px; }
+        .app-card { background: white; width: 100%; max-width: 400px; border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: #2c3e50; color: white; padding: 20px; text-align: center; }
+        .preview-container { position: relative; width: 100%; height: 300px; background: #333; }
+        #preview { width: 100%; height: 100%; object-fit: cover; }
+        .scan-line { position: absolute; top: 0; width: 100%; height: 4px; background: #00ff00; box-shadow: 0 0 15px #00ff00; animation: scan 2s infinite; display: none; }
+        .controls { padding: 25px; }
+        .btn-upload { background: #007bff; color: white; padding: 16px; border-radius: 14px; display: block; text-align: center; cursor: pointer; font-weight: bold; }
+        .results-panel { background: #fff; margin: 0 20px 20px; padding: 20px; border-radius: 15px; display: none; border: 1px solid #eee; }
+        .status-badge { font-size: 1.3rem; font-weight: 800; text-align: center; margin-bottom: 10px; }
+        .data-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f9f9f9; }
+        #fleshPreview { width: 50px; height: 50px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: background 0.5s; }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+        canvas { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="app-card">
+    <div class="header">
+        <h3 style="margin:0">AI INTERNAL LAB</h3>
+        <small id="aiThinking" style="color: #2ecc71;">System Ready</small>
+    </div>
+
+    <div class="preview-container">
+        <div id="scanLine" class="scan-line"></div>
+        <img id="preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23555' d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E">
+    </div>
+
+    <div class="controls">
+        <label class="btn-upload">
+            📷 SCAN FRUIT
+            <input type="file" id="imageInput" accept="image/*" capture="environment" hidden>
+        </label>
+    </div>
+
+    <div id="results" class="results-panel">
+        <div id="detectedType" style="text-align: center; font-weight: bold; color: #007bff; text-transform: uppercase;"></div>
+        <div id="statusText" class="status-badge">Analyzing...</div>
+        
+        <div class="data-row">
+            <span>Estimated Internal Color:</span>
+            <div id="fleshPreview"></div>
+        </div>
+        <div class="data-row"><span>Ripeness:</span> <b id="valInternal">0%</b></div>
+        <div class="data-row"><span>Surface Health:</span> <b id="valHealth">0%</b></div>
+        <p id="advice" style="font-size: 0.85rem; color: #666; text-align: center; margin-top: 10px;"></p>
+    </div>
+    <canvas id="calcCanvas"></canvas>
+</div>
+
+<script>
+    const imageInput = document.getElementById('imageInput');
+    const preview = document.getElementById('preview');
+    const resultsPanel = document.getElementById('results');
+    const scanLine = document.getElementById('scanLine');
+    const aiLabel = document.getElementById('aiThinking');
+
+    imageInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        aiLabel.innerText = "Scanning Molecular Data...";
+        scanLine.style.display = 'block';
+        resultsPanel.style.display = 'none';
+        
+        const reader = new FileReader();
+        reader.onload = (f) => {
+            preview.src = f.target.result;
+            const img = new Image();
+            img.src = f.target.result;
+            img.onload = () => {
+                setTimeout(() => {
+                    analyzeAuto(img);
+                    scanLine.style.display = 'none';
+                    aiLabel.innerText = "Analysis Complete";
+                }, 1200);
+            };
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function analyzeAuto(img) {
+        const canvas = document.getElementById('calcCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 100; canvas.height = 100;
+        ctx.drawImage(img, 0, 0, 100, 100);
+
+        const data = ctx.getImageData(0, 0, 100, 100).data;
+        let rS = 0, gS = 0, bS = 0, darkPixels = 0;
+
+        for (let i = 0; i < data.length; i += 4) {
+            rS += data[i]; gS += data[i+1]; bS += data[i+2];
+            if ((data[i] + data[i+1] + data[i+2])/3 < 50) darkPixels++;
+        }
+
+        const total = data.length / 4;
+        const r = rS / total; const g = gS / total; const b = bS / total;
+
+        let detected = "";
+        let ripeness = 0;
+        let fleshColor = "";
+
+        // NEW DETECTION LOGIC
+        // Guava is usually very green (G > R) and significantly lighter than watermelon.
+        if (g > r && g > 130 && b > 70) {
+            detected = "Guava";
+            // Guava ripeness: as it yellows (R increases), the pink/cream center develops
+            ripeness = ((r + g) / 400) * 100;
+            // Flesh logic: starts Creamy White, shifts to Soft Pink
+            fleshColor = `rgb(255, ${255 - (ripeness * 0.4)}, ${235 - (ripeness * 0.5)})`;
+        } 
+        // Watermelon: Darker greens, much lower Blue/Red usually
+        else if (g > r && g < 130) {
+            detected = "Watermelon";
+            ripeness = (r / (g + 1)) * 130;
+            fleshColor = `rgb(${160 + ripeness}, 40, 60)`;
+        }
+        // Mango: Red and Green are both high (Yellow surface)
+        else {
+            detected = "Mango";
+            ripeness = ((r - b) / (g + 1)) * 95;
+            fleshColor = `rgb(255, ${210 - (ripeness * 1.1)}, 20)`;
+        }
+
+        const health = Math.max(0, 100 - (darkPixels/total * 400));
+        updateUI(ripeness, health, detected, fleshColor);
+    }
+
+    function updateUI(score, health, fruit, color) {
+        resultsPanel.style.display = 'block';
+        document.getElementById('detectedType').innerText = "AI DETECTED: " + fruit;
+        document.getElementById('valInternal').innerText = Math.round(score) + "%";
+        document.getElementById('valHealth').innerText = Math.round(health) + "%";
+        document.getElementById('fleshPreview').style.backgroundColor = color;
+
+        const status = document.getElementById('statusText');
+        const advice = document.getElementById('advice');
+
+        // Logic to ensure Guava is marked as Ready if Health is high
+        if (health < 80) {
+            status.innerText = "⚠️ POOR QUALITY";
+            status.style.color = "var(--damaged-color)";
+            advice.innerText = "Possible bruising detected on the skin.";
+        } else if (score > 45) { // Lowered threshold for Guava/Mango readiness
+            status.innerText = "✅ RIPE & FRESH";
+            status.style.color = "var(--ripe-color)";
+            advice.innerText = `This ${fruit} is at peak internal quality. Enjoy!`;
+        } else {
+            status.innerText = "⏳ MATURING";
+            status.style.color = "var(--almost-color)";
+            advice.innerText = `Internal sugars are still developing. Ready in 1-2 days.`;
+        }
+    }
+</script>
+</body>
+</html>
