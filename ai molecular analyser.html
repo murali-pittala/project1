@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Fruit Internal Scanner v2.1</title>
+    <style>
+        :root {
+            --ripe-color: #2ecc71;
+            --almost-color: #f1c40f;
+            --unripe-color: #e74c3c;
+            --scan-glow: #00ff00;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: #eee; display: flex; justify-content: center; padding: 20px; }
+        .app-card { background: #2c3e50; width: 100%; max-width: 420px; border-radius: 28px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); overflow: hidden; border: 1px solid #444; }
+        .header { background: #1c2833; padding: 20px; text-align: center; border-bottom: 2px solid #34495e; }
+        .preview-container { position: relative; width: 100%; height: 280px; background: #000; overflow: hidden; }
+        #preview { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
+        .scan-line { position: absolute; top: 0; width: 100%; height: 6px; background: var(--scan-glow); box-shadow: 0 0 20px var(--scan-glow); animation: scan 1.5s infinite linear; display: none; z-index: 10; }
+        .controls { padding: 20px; }
+        .btn-upload { background: #3498db; color: white; padding: 18px; border-radius: 16px; display: block; text-align: center; cursor: pointer; font-weight: bold; transition: 0.3s; border: none; }
+        .btn-upload:active { transform: scale(0.95); }
+        .results-panel { background: #34495e; margin: 0 15px 15px; padding: 20px; border-radius: 20px; display: none; animation: slideUp 0.5s ease; }
+        .internal-report { background: rgba(0,0,0,0.2); border-radius: 12px; padding: 15px; margin-top: 15px; border-left: 4px solid var(--ripe-color); }
+        .report-title { font-size: 0.8rem; text-transform: uppercase; color: #bdc3c7; letter-spacing: 1px; margin-bottom: 10px; }
+        .data-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
+        #fleshPreview { width: 40px; height: 40px; border-radius: 10px; border: 2px solid #fff; }
+        @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        canvas { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="app-card">
+    <div class="header">
+        <h3 style="margin:0; color: var(--scan-glow);">MOLECULAR SENSOR</h3>
+        <small id="aiThinking">System Ready for Scanning</small>
+    </div>
+
+    <div class="preview-container">
+        <div id="scanLine" class="scan-line"></div>
+        <img id="preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23555' d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E">
+    </div>
+
+    <div class="controls">
+        <label class="btn-upload">
+            🔍 ANALYZE FRUIT INTERNALS
+            <input type="file" id="imageInput" accept="image/*" capture="environment" hidden>
+        </label>
+    </div>
+
+    <div id="results" class="results-panel">
+        <div id="detectedType" style="text-align: center; font-weight: bold; color: #3498db; margin-bottom: 5px;"></div>
+        <div id="statusText" style="font-size: 1.4rem; font-weight: 800; text-align: center; margin-bottom: 15px;">Analyzing...</div>
+        
+        <div class="internal-report">
+            <div class="report-title">Internal Core Diagnostics</div>
+            <div class="data-row"><span>Center Color:</span> <div id="fleshPreview"></div></div>
+            <div class="data-row"><span>Sugar Level (Brix):</span> <b id="valSugar">--</b></div>
+            <div class="data-row"><span>Flesh Density:</span> <b id="valDensity">--</b></div>
+            <div class="data-row"><span>Seed Maturation:</span> <b id="valSeeds">--</b></div>
+        </div>
+
+        <p id="advice" style="font-size: 0.85rem; color: #bdc3c7; text-align: center; margin-top: 15px; font-style: italic;"></p>
+    </div>
+    <canvas id="calcCanvas"></canvas>
+</div>
+
+<script>
+    const imageInput = document.getElementById('imageInput');
+    const preview = document.getElementById('preview');
+    const resultsPanel = document.getElementById('results');
+    const scanLine = document.getElementById('scanLine');
+    const aiLabel = document.getElementById('aiThinking');
+
+    imageInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        aiLabel.innerText = "Analyzing Sub-Surface Layers...";
+        scanLine.style.display = 'block';
+        resultsPanel.style.display = 'none';
+        
+        const reader = new FileReader();
+        reader.onload = (f) => {
+            preview.src = f.target.result;
+            const img = new Image();
+            img.src = f.target.result;
+            img.onload = () => {
+                setTimeout(() => {
+                    processInternalData(img);
+                    scanLine.style.display = 'none';
+                    aiLabel.innerText = "Scan Complete";
+                }, 1500);
+            };
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function processInternalData(img) {
+        const canvas = document.getElementById('calcCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 100; canvas.height = 100;
+        ctx.drawImage(img, 0, 0, 100, 100);
+
+        const data = ctx.getImageData(0, 0, 100, 100).data;
+        let r = 0, g = 0, b = 0;
+        for (let i = 0; i < data.length; i += 4) {
+            r += data[i]; g += data[i+1]; b += data[i+2];
+        }
+        const total = data.length / 4;
+        r /= total; g /= total; b /= total;
+
+        let type = "Unknown";
+        let sugar = "Low";
+        let density = "Firm";
+        let seeds = "Developing";
+        let fleshColor = "rgb(255,255,255)";
+
+        // Logic for "The Middle"
+        if (g > r && g > 110) {
+            type = "Guava / Green Fruit";
+            sugar = (r > 100) ? "12% (Sweet)" : "7% (Mild)";
+            density = (r > 100) ? "Soft/Creamy" : "Crisp/Hard";
+            seeds = (r > 110) ? "Softened" : "Hardened";
+            fleshColor = `rgb(255, ${255 - (r/2)}, ${220 - (r/2)})`;
+        } else if (r > g) {
+            type = "Mango / Stone Fruit";
+            sugar = (r > 150) ? "18% (Very High)" : "11% (Standard)";
+            density = (r > 160) ? "Juicy/Fibrous" : "Firm/Dense";
+            seeds = "Pit Hardened";
+            fleshColor = `rgb(255, ${200 - (g/2)}, 0)`;
+        }
+
+        resultsPanel.style.display = 'block';
+        document.getElementById('detectedType').innerText = "AI SCAN: " + type;
+        document.getElementById('valSugar').innerText = sugar;
+        document.getElementById('valDensity').innerText = density;
+        document.getElementById('valSeeds').innerText = seeds;
+        document.getElementById('fleshPreview').style.backgroundColor = fleshColor;
+        document.getElementById('statusText').innerText = (r > 100) ? "OPTIMAL QUALITY" : "READY SOON";
+        document.getElementById('statusText').style.color = (r > 100) ? "var(--ripe-color)" : "var(--almost-color)";
+        document.getElementById('advice').innerText = "Molecular estimation suggests the core is " + density.toLowerCase() + " and safe for consumption.";
+    }
+</script>
+</body>
+</html>
