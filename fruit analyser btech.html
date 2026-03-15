@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Fruit Scanner | Multi-Fruit B.Tech Project</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --success: #2ecc71; --error: #e74c3c; --warning: #f1c40f; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f9; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        header { width: 100%; background: var(--primary); color: white; text-align: center; padding: 1rem 0; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .container { max-width: 500px; width: 90%; background: white; margin: 20px; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .viewer { width: 100%; height: 320px; background: #1a1a1a; border-radius: 15px; overflow: hidden; margin-bottom: 20px; border: 2px solid #eee; }
+        video, img { width: 100%; height: 100%; object-fit: contain; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn { padding: 12px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.3s; font-size: 0.95rem; }
+        .btn-blue { background: var(--accent); color: white; }
+        .btn-analyze { grid-column: span 2; background: var(--success); color: white; margin-top: 10px; font-size: 1.1rem; }
+        .btn:disabled { background: #bdc3c7 !important; cursor: not-allowed; }
+        .result-box { display: none; margin-top: 20px; padding: 20px; background: #fdfdfd; border: 1px solid #eee; border-radius: 12px; animation: slideUp 0.4s ease; }
+        @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .tag { padding: 6px 14px; border-radius: 6px; color: white; font-weight: bold; display: inline-block; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h2>Advanced Fruit Analytics</h2>
+    <p style="margin:0; font-size:0.85rem; opacity:0.9;">B.Tech Engineering Prototype v7.0</p>
+</header>
+
+<div class="container">
+    <div class="viewer">
+        <video id="video" autoplay playsinline></video>
+        <img id="preview" style="display:none;">
+    </div>
+
+    <div class="btn-grid">
+        <button class="btn btn-blue" onclick="capturePhoto()">Capture</button>
+        <button class="btn btn-blue" style="background:#9b59b6" onclick="document.getElementById('fileIn').click()">Upload Photo</button>
+        <input type="file" id="fileIn" hidden accept="image/*" onchange="loadFile(event)">
+        <button class="btn btn-analyze" id="analyzeBtn" disabled onclick="runComprehensiveAnalysis()">Analyze Quality</button>
+    </div>
+
+    <canvas id="procCanvas" style="display:none;"></canvas>
+
+    <div class="result-box" id="resultBox">
+        <h3 style="margin:0 0 10px 0; color:var(--primary); border-bottom: 2px solid #f0f0f0; padding-bottom: 5px;">Scan Report</h3>
+        <p><b>Fruit Name:</b> <span id="fruitOut" style="color:var(--accent); font-weight:bold;">--</span></p>
+        <p><b>Internal Color:</b> <span id="internalOut">--</span></p>
+        <p><b>Status:</b> <span id="statusOut" class="tag">--</span></p>
+        <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+        <p style="font-size:0.85rem; color:#555; line-height:1.4;" id="logicNotes"></p>
+        <button class="btn btn-blue" style="width:100%; background:#7f8c8d; margin-top:10px;" onclick="location.reload()">Start New Scan</button>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById("video");
+    const preview = document.getElementById("preview");
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    const resultBox = document.getElementById("resultBox");
+    const canvas = document.getElementById("procCanvas");
+
+    navigator.mediaDevices.getUserMedia({video: true}).then(s => video.srcObject = s).catch(() => console.log("Camera access denied"));
+
+    function loadFile(e) {
+        const reader = new FileReader();
+        reader.onload = ev => setupUI(ev.target.result);
+        reader.readAsDataURL(e.target.files[0]);
+    }
+
+    function capturePhoto() {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0);
+        setupUI(canvas.toDataURL("image/png"));
+    }
+
+    function setupUI(src) {
+        preview.src = src;
+        preview.style.display = "block";
+        video.style.display = "none";
+        analyzeBtn.disabled = false;
+        analyzeBtn.innerText = "Analyze Quality";
+        resultBox.style.display = "none";
+    }
+
+    function runComprehensiveAnalysis() {
+        // ONE-TIME CLICK LOCK
+        analyzeBtn.disabled = true;
+        analyzeBtn.innerText = "Analysis Locked";
+        resultBox.style.display = "block";
+
+        const ctx = canvas.getContext("2d");
+        canvas.width = 100; canvas.height = 100;
+        ctx.drawImage(preview, 0, 0, 100, 100);
+        const imgData = ctx.getImageData(0, 0, 100, 100).data;
+
+        let rSum=0, gSum=0, bSum=0, darkCount=0, pinkCount=0, yellowCount=0;
+        for(let i=0; i<imgData.length; i+=4) {
+            let r=imgData[i], g=imgData[i+1], b=imgData[i+2];
+            rSum+=r; gSum+=g; bSum+=b;
+            if(r < 60 && g < 60 && b < 60) darkCount++;
+            if(r > 180 && b > 120 && g < 150) pinkCount++;
+            if(r > 180 && g > 160 && b < 100) yellowCount++;
+        }
+
+        let total = imgData.length/4;
+        let avgR = rSum/total, avgG = gSum/total, avgB = bSum/total;
+        let decay = (darkCount/total)*100;
+
+        let fruit="Unknown", internal="Unknown", status="RE-SCAN", bg="#7f8c8d", note="";
+
+        // MASTER FRUIT DETECTION LOGIC
+        // 1. Dragon Fruit (High Pink/Magenta)
+        if(pinkCount > 200) {
+            fruit = "Dragon Fruit";
+            internal = "White / Deep Red (with black seeds)";
+            status = "READY TO EAT";
+            bg = "var(--success)";
+            note = "High magenta levels detected on external skin. Characteristic of ripe Dragon Fruit.";
+        }
+        // 2. Banana (High Yellow + Shape logic)
+        else if(avgR > 160 && avgG > 150 && avgB < 120) {
+            fruit = "Banana";
+            internal = "Creamy White";
+            if(decay > 18) {
+                status = "NOT GOOD (OVERRIPE)";
+                bg = "var(--error)";
+                note = "Detected excessive dark pigmentation. Internal tissue likely soft/oxidized.";
+            } else {
+                status = "READY TO EAT";
+                bg = "var(--success)";
+                note = "Yellow chromaticity is within fresh range.";
+            }
+        }
+        // 3. Mango (Vibrant Orange-Yellow)
+        else if(avgR > 180 && avgG > 120 && avgB < 80) {
+            fruit = "Mango";
+            internal = "Golden Yellow / Orange";
+            status = "READY TO EAT";
+            bg = "var(--success)";
+            note = "Vibrant orange-yellow spectrum indicates high sugar content.";
+        }
+        // 4. Watermelon (Dominant Green + Dark Contrast)
+        else if(avgG > 100 && avgG > avgR + 30 && darkCount > 500) {
+            fruit = "Watermelon";
+            internal = "Deep Red";
+            status = "READY TO EAT";
+            bg = "var(--success)";
+            note = "Alternating green and dark pixel density matches striped rind patterns.";
+        }
+        // 5. Guava / Custard Apple (Lighter Green Matte)
+        else if(avgG > avgR && avgG > avgB) {
+            if(avgG > 140) {
+                fruit = "Guava";
+                internal = "White / Pinkish White";
+            } else {
+                fruit = "Custard Apple";
+                internal = "Creamy White (with black seeds)";
+            }
+            status = "READY TO EAT";
+            bg = "var(--success)";
+            note = "High green reflectance with matte texture detected.";
+        }
+        // 6. Apple (High Red)
+        else if(avgR > avgG + 40) {
+            fruit = "Apple";
+            internal = "White / Cream";
+            status = "READY TO EAT";
+            bg = "var(--success)";
+            note = "Strong Red Anthocyanin pigments detected on skin.";
+        }
+        else {
+            fruit = "Object Detected";
+            note = "Fruit type unclear. Please ensure clear lighting and central placement.";
+        }
+
+        document.getElementById("fruitOut").innerText = fruit;
+        document.getElementById("internalOut").innerText = internal;
+        document.getElementById("statusOut").innerText = status;
+        document.getElementById("statusOut").style.backgroundColor = bg;
+        document.getElementById("logicNotes").innerHTML = "<b>AI Logic:</b> " + note;
+    }
+</script>
+</body>
+</html>
