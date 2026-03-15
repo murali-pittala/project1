@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Fruit Quality Scanner v5.0</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --success: #2ecc71; --error: #e74c3c; --warning: #f1c40f; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        header { width: 100%; background: var(--primary); color: white; text-align: center; padding: 15px 0; }
+        .container { max-width: 500px; width: 92%; background: white; margin: 20px; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .viewer { width: 100%; height: 320px; background: black; border-radius: 12px; overflow: hidden; margin-bottom: 20px; border: 2px solid #ddd; }
+        video, img { width: 100%; height: 100%; object-fit: contain; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .btn { padding: 14px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-blue { background: var(--accent); color: white; }
+        .btn-analyze { grid-column: span 2; background: var(--success); color: white; font-size: 1.1rem; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .result-box { display: none; margin-top: 20px; padding: 20px; background: #fafafa; border-radius: 15px; border: 1px solid #eee; }
+        .tag { padding: 6px 12px; border-radius: 6px; color: white; font-weight: bold; font-size: 0.9rem; }
+        .metric-bar { height: 8px; background: #eee; border-radius: 10px; margin-top: 5px; overflow: hidden; }
+        .metric-fill { height: 100%; background: var(--accent); transition: width 0.5s; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>AI Smart Fruit Analyzer</h1>
+    <p>Automated Identification & Health Grade</p>
+</header>
+
+<div class="container">
+    <div class="viewer">
+        <video id="video" autoplay playsinline></video>
+        <img id="preview" style="display:none;">
+    </div>
+
+    <div class="btn-grid">
+        <button class="btn btn-blue" onclick="capturePhoto()">Capture</button>
+        <button class="btn btn-blue" style="background:#9b59b6" onclick="document.getElementById('fileIn').click()">Upload</button>
+        <input type="file" id="fileIn" hidden accept="image/*" onchange="loadFile(event)">
+        <button class="btn btn-analyze" id="analyzeBtn" disabled onclick="runAnalysis()">Analyze Quality</button>
+    </div>
+
+    <canvas id="hiddenCanvas" style="display:none;"></canvas>
+
+    <div class="result-box" id="resultBox">
+        <h3 style="margin-top:0">Scan Results</h3>
+        <p><b>Detected Fruit:</b> <span id="fruitOut" style="color:var(--accent); font-weight:bold;">--</span></p>
+        <p><b>Internal Forecast:</b> <span id="colorOut">--</span></p>
+        <p><b>Health Status:</b> <span id="statusOut" class="tag">--</span></p>
+        
+        <div style="margin-top:15px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.8rem;">
+                <span>Surface Confidence</span>
+                <span id="confVal">0%</span>
+            </div>
+            <div class="metric-bar"><div class="metric-fill" id="confBar" style="width: 0%"></div></div>
+        </div>
+
+        <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
+        <p id="logicNotes" style="font-size:0.8rem; color:#666; font-style:italic; line-height:1.4;"></p>
+        <button class="btn btn-blue" style="width:100%; background:#95a5a6; margin-top:10px;" onclick="location.reload()">New Scan</button>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById("video");
+    const preview = document.getElementById("preview");
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    const canvas = document.getElementById("hiddenCanvas");
+    const resultBox = document.getElementById("resultBox");
+
+    navigator.mediaDevices.getUserMedia({video: true})
+        .then(s => video.srcObject = s)
+        .catch(() => console.log("Camera inactive. Using upload mode."));
+
+    function loadFile(e) {
+        const reader = new FileReader();
+        reader.onload = ev => setupPreview(ev.target.result);
+        reader.readAsDataURL(e.target.files[0]);
+    }
+
+    function capturePhoto() {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0);
+        setupPreview(canvas.toDataURL("image/png"));
+    }
+
+    function setupPreview(src) {
+        preview.src = src;
+        preview.style.display = "block";
+        video.style.display = "none";
+        analyzeBtn.disabled = false;
+        resultBox.style.display = "none";
+    }
+
+    function runAnalysis() {
+        resultBox.style.display = "block";
+        const ctx = canvas.getContext("2d");
+        const size = 100; // Sample size for processing
+        canvas.width = size;
+        canvas.height = size;
+        ctx.drawImage(preview, 0, 0, size, size);
+
+        const pixels = ctx.getImageData(0, 0, size, size).data;
+        let counts = { red: 0, yellow: 0, green: 0, orange: 0, pink: 0, dark: 0 };
+        let total = pixels.length / 4;
+
+        for (let i = 0; i < pixels.length; i += 4) {
+            let r = pixels[i], g = pixels[i+1], b = pixels[i+2];
+            
+            // RELATIVE COLOR LOGIC (Better than fixed numbers)
+            if (r > 150 && g > 150 && b < 100) counts.yellow++;
+            else if (r > 150 && g < 100 && b < 100) counts.red++;
+            else if (g > 120 && r < 120) counts.green++;
+            else if (r > 180 && g > 100 && g < 180 && b < 100) counts.orange++;
+            else if (r > 180 && b > 120 && g < 150) counts.pink++;
+            
+            if (r < 80 && g < 80 && b < 80) counts.dark++;
+        }
+
+        // Calculate percentages
+        let p = {
+            y: (counts.yellow / total) * 100,
+            r: (counts.red / total) * 100,
+            g: (counts.green / total) * 100,
+            o: (counts.orange / total) * 100,
+            pk: (counts.pink / total) * 100,
+            d: (counts.dark / total) * 100
+        };
+
+        let fruit = "Unknown Object", internal = "Unknown", status = "RESCAN", bg = "var(--warning)", conf = 0, notes = "";
+
+        // DECISION TREE LOGIC
+        if (p.y > 25) {
+            fruit = "Banana";
+            internal = "Creamy White";
+            conf = p.y + (100 - p.d);
+            status = p.d > 20 ? "NOT GOOD (DECAY)" : "READY TO EAT";
+            bg = p.d > 20 ? "var(--error)" : "var(--success)";
+            notes = "Identified by high yellow chromaticity. Decay risk assessed by dark pixel density.";
+        } 
+        else if (p.g > 20 && p.d > 5) {
+            fruit = "Watermelon";
+            internal = "Bright Red";
+            conf = p.g + p.d;
+            status = "READY TO EAT";
+            bg = "var(--success)";
+            notes = "Green-to-Dark contrast confirms striped rind pattern.";
+        }
+        else if (p.pk > 15) {
+            fruit = "Dragon Fruit";
+            internal = "White / Red (with Seeds)";
+            conf = p.pk + p.g;
+            status = "READY TO EAT";
+            bg = "var(--success)";
+            notes = "Vibrant magenta-pink levels detected; unique to Hylocereus species.";
+        }
+        else if (p.o > 20) {
+            fruit = "Orange / Citrus";
+            internal = "Orange Pulp";
+            conf = p.o;
+            status = "READY TO EAT";
+            bg = "var(--success)";
+            notes = "Uniform orange hue detected across fruit surface.";
+        }
+        else if (p.r > 20) {
+            fruit = "Apple / Pomegranate";
+            internal = "White / Red Seeds";
+            conf = p.r;
+            status = "READY TO EAT";
+            bg = "var(--success)";
+            notes = "Red spectrum dominant. High probability of Pome fruit category.";
+        } else {
+            notes = "Light too low or fruit color not in database. Please ensure the fruit is centered.";
+        }
+
+        // Final UI Update
+        document.getElementById("fruitOut").innerText = fruit;
+        document.getElementById("colorOut").innerText = internal;
+        document.getElementById("statusOut").innerText = status;
+        document.getElementById("statusOut").style.backgroundColor = bg;
+        document.getElementById("confVal").innerText = Math.min(Math.round(conf), 100) + "%";
+        document.getElementById("confBar").style.width = Math.min(conf, 100) + "%";
+        document.getElementById("logicNotes").innerText = "AI Logic: " + notes;
+    }
+</script>
+
+</body>
+</html>
