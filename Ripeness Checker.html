@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fruit Ripeness Checker</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; padding: 20px; background-color: #f4f4f9; }
+        .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 300px; }
+        .input-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { width: 100%; padding: 10px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+        button:hover { background-color: #45a049; }
+        #result { margin-top: 1.5rem; text-align: center; font-size: 1.2rem; font-weight: bold; color: #333; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Ripeness Checker</h2>
+    
+    <div class="input-group">
+        <label>Color (0-100):</label>
+        <input type="number" id="color" value="80">
+    </div>
+
+    <div class="input-group">
+        <label>Firmness (0-100):</label>
+        <input type="number" id="firmness" value="30">
+    </div>
+
+    <div class="input-group">
+        <label>Sugar Level (0-100):</label>
+        <input type="number" id="sugar" value="75">
+    </div>
+
+    <button onclick="checkRipeness()">Check Ripeness</button>
+
+    <div id="result">Fruit ripeness: -</div>
+</div>
+
+<script>
+    function checkRipeness() {
+        // Get values from inputs
+        const colorValue = parseInt(document.getElementById('color').value);
+        const firmness = parseInt(document.getElementById('firmness').value);
+        const sugarLevel = parseInt(document.getElementById('sugar').value);
+        const resultDiv = document.getElementById('result');
+
+        let status = "";
+
+        // Logic converted from Python
+        if (colorValue > 70 && firmness < 40 && sugarLevel > 60) {
+            status = "Ripe";
+        } else if (colorValue > 40 && firmness < 70) {
+            status = "Almost ripe";
+        } else {
+            status = "Unripe";
+        }
+
+        // Display the result
+        resultDiv.innerText = "Fruit ripeness: " + status;
+    }
+</script>
+
+</body>
+</html>
+
+
+
+
